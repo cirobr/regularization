@@ -35,6 +35,7 @@ using CUDA
 CUDA.device!(cudadevice)
 CUDA.versioninfo()
 
+using TinyMachines
 using Flux
 import Flux: relu, leakyrelu, dice_coeff_loss, focal_loss
 dev = CUDA.has_cuda_gpu() ? gpu : cpu
@@ -50,11 +51,9 @@ using Dates
 
 # private libs
 using PascalVocTools;      const pv=PascalVocTools
-using TinyMachines;        const tm=TinyMachines
 using PreprocessingImages; const p=PreprocessingImages
 using LibFluxML
-import LibFluxML: IoU_loss, ce3_loss, cosine_loss, softloss,
-                  AccScore, F1Score, IoUScore
+import LibFluxML: IoU_loss, ce3_loss, cosine_loss, AccScore, F1Score, IoUScore
 using LibCUDA
 
 LibCUDA.cleangpu()
