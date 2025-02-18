@@ -210,28 +210,23 @@ ytr = ytrain[:,:,:,1:1] |> dev
 
 # results DataFrame
 results = DataFrame(
-      dropc1 = Float32[],
-      dropc2 = Float32[],
-      dropc3 = Float32[],
-      dropc4 = Float32[],
+      dropd1 = Float32[],
+      dropd2 = Float32[],
+      dropd3 = Float32[],
+      dropd4 = Float32[],
+      dropd5 = Float32[],
       validloss = Float32[],
 )
-drope3 = 0.0
-drope2 = 0.0
-drope1 = 0.0
 
 # tuning function
 function objective(trial)
-      @unpack dropc1, dropc2, dropc3, dropc4 = trial
-      # @info "objective: optimizer=$optfn, η=$η, λ=$λ"
-      @info "objective: dropc1=$dropc1, dropc2=$dropc2, dropc3=$dropc3, dropc4=$dropc4"
+      @unpack dropd1, dropd2, dropd3, dropd4, dropd5 = trial
+      @info "objective: dropd1=$dropd1, dropd2=$dropd2, dropd3=$dropd3, dropd4=$dropd4, dropd5=$dropd5"
 
       # model
       Random.seed!(1234)   # to enforce reproducibility
-      model = UNet4(3,C; activation=leakyrelu, alpha=1, verbose=false,
-                    dropc1=dropc1, dropc2=dropc2, dropc3=dropc3, dropc4=dropc4,
-                    drope3=drope3, drope2=drope2, drope1=drope1) |> dev
-
+      model = MobileUnet(3,C; verbose=false,
+                        dropd1=dropd1, dropd2=dropd2, dropd3=dropd3, dropd4=dropd4, dropd5=dropd5) |> dev
       # check for matching between model and data
       @assert size(model(Xtr)) == size(ytr) || error("model/data features do not match")
 
@@ -277,7 +272,7 @@ function objective(trial)
 
       # save partial results
       # push!(results, [string(optfn), η, λ, final_loss])
-      push!(results, [dropc1, dropc2, dropc3, dropc4, final_loss])
+      push!(results, [dropd1, dropd2, dropd3, dropd4, dropd5, final_loss])
       outputfile = script_name[1:end-3] * ".csv"
       CSV.write(outputfile, results)
       
@@ -294,20 +289,22 @@ LibCUDA.cleangpu()
 # optfns = [Flux.Adam, Flux.RMSProp]
 # ηs = [1.e-4, 5.e-4]
 # λs = [0.0, 5.e-7, 5.e-5]
-dropc1s = [0.0, 0.1, 0.2]
-dropc2s = [0.0, 0.1, 0.2]
-dropc3s = [0.0, 0.1, 0.2]
-dropc4s = [0.0, 0.1, 0.2]
+dropd1s = [0.0, 0.1, 0.2]
+dropd2s = [0.0, 0.1, 0.2]
+dropd3s = [0.0, 0.1, 0.2]
+dropd4s = [0.0, 0.1, 0.2]
+dropd5s = [0.0, 0.1, 0.2]
 
 if debugflag
       # lossfns = lossfns[1:2]
       # optfns  = optfns[1:2]
       # ηs      = ηs[1:2]
       # λs      = λs[1:2]
-      dropc1s = dropc1s[1:2]
-      dropc2s = dropc2s[1:2]
-      dropc3s = dropc3s[1:1]
-      dropc4s = dropc4s[1:1] 
+      dropd1s = dropd1s[1:2]
+      dropd2s = dropd2s[1:2]
+      dropd3s = dropd3s[1:1]
+      dropd4s = dropd4s[1:1]
+      dropd5s = dropd5s[1:1]
 end
 
 
@@ -316,10 +313,11 @@ scenario = Scenario(
       # optfn   = optfns,
       # η       = ηs,
       # λ       = λs,
-      dropc1  = dropc1s,
-      dropc2  = dropc2s,
-      dropc3  = dropc3s,
-      dropc4  = dropc4s,
+      dropd1  = dropd1s,
+      dropd2  = dropd2s,
+      dropd3  = dropd3s,
+      dropd4  = dropd4s,
+      dropd5  = dropd5s,
       sampler = GridSampler(),
 )
 
