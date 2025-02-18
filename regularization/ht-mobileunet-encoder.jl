@@ -225,7 +225,7 @@ function objective(trial)
 
       # model
       Random.seed!(1234)   # to enforce reproducibility
-      model = MobileUnet(3,C; verbose=false,
+      model = MobileUNet(3,C; verbose=false,
                         dropd1=dropd1, dropd2=dropd2, dropd3=dropd3, dropd4=dropd4, dropd5=dropd5) |> dev
       # check for matching between model and data
       @assert size(model(Xtr)) == size(ytr) || error("model/data features do not match")
