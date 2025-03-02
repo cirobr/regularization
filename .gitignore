@@ -4,6 +4,4 @@ tblogs/
 
 # symlinks
 coco
-dataset/augmented
-dataset/resized
-images
+dataset/images

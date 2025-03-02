@@ -12,8 +12,8 @@ cudadevice = parse(Int64, ARGS[1])
 nepochs    = parse(Int64, ARGS[2])
 debugflag  = parse(Bool,  ARGS[3])
 
-# cudadevice = 0
-# nepochs    = 400
+# cudadevice = 1
+# nepochs    = 100
 # debugflag  = true
 
 script_name = basename(@__FILE__)
@@ -35,6 +35,7 @@ using CUDA
 CUDA.device!(cudadevice)
 CUDA.versioninfo()
 
+using HyperTuning
 using TinyMachines
 using Flux
 import Flux: relu, leakyrelu, dice_coeff_loss, focal_loss
@@ -45,6 +46,9 @@ using CSV
 using JLD2
 using FLoops
 using Random
+# using Statistics: mean, minimum, maximum, norm
+# using StatsBase: sample
+# using MLUtils: splitobs, kfolds, randobs
 using Mmap
 using Dates
 
@@ -77,12 +81,12 @@ outputfolder = script_name[1:end-3] * "/"
 datasetpath = "../dataset/"
 # mkpath(expanduser(datasetpath))   # it should already exist
 
-modelspath  = "./models/" * outputfolder
-mkpath(expanduser(modelspath))
+# modelspath  = "./models/" * outputfolder
+# mkpath(expanduser(modelspath))
 
-tblogspath  = "./tblogs/" * outputfolder
-rm(tblogspath; force=true, recursive=true)
-mkpath(expanduser(tblogspath))
+# tblogspath  = "./tblogs/" * outputfolder
+# rm(tblogspath; force=true, recursive=true)
+# mkpath(expanduser(tblogspath))
 
 tmp_path = "/scratch/cirobr/tmp/"
 # tmp_path = "/tmp/"
@@ -131,6 +135,7 @@ dbsizeGB = dpsizeGB * (Ntrain + Nvalid)
 @info "dataset size = $(dbsizeGB) GB"
 # @assert dbsizeGB < 2.0 || error("dataset is too large")
 # @info "dataset size OK"
+
 
 # create tensors
 @info "creating tensors..."
@@ -193,98 +198,144 @@ validset = Flux.DataLoader((Xvalid, yvalid),
 @info "dataloader OK"
 
 
-### model
-Random.seed!(1234)   # to enforce reproducibility
-modelcpu = UNet5(3,C; activation=leakyrelu, alpha=1, verbose=false)
-# fpfn = expanduser("")
-# LibFluxML.loadModelState!(fpfn, modelcpu)
-model    = modelcpu |> dev;
-@info "model OK"
+LibCUDA.cleangpu()
 
 
-# check for matching between model and data
-Xtr = Xtrain[:,:,:,1:1] |> dev
-ytr = ytrain[:,:,:,1:1] |> dev
-@assert size(model(Xtr)) == size(ytr) || error("model/data features do not match")
-@info "model/data matching OK"
-
-
-# loss functions
-# lossFunction(yhat, y) = IoU_loss(yhat, y)
+# loss function
 lossFunction(yhat, y) = dice_coeff_loss(yhat, y) + focal_loss(yhat, y; dims=3)
-lossfns = [lossFunction]
 @info "loss function OK"
 
 
-# optimizer
-optimizerFunction = Flux.Adam
-η = 1e-4
-λ = 0.0
-modelOptimizer = λ > 0 ? Flux.Optimiser(WeightDecay(λ), optimizerFunction(η)) : optimizerFunction(η)
+Xtr = Xtrain[:,:,:,1:1] |> dev
+ytr = ytrain[:,:,:,1:1] |> dev
 
 
-optimizerState = Flux.setup(modelOptimizer, model)
-# Flux.freeze!(optimizerState.enc)
-@info "optimizer OK"
+# results DataFrame
+results = DataFrame(
+      dropc1 = Float32[],
+      dropc2 = Float32[],
+      dropc3 = Float32[],
+      dropc4 = Float32[],
+      dropc5 = Float32[],
+      validloss = Float32[],
+)
 
+# tuning function
+function objective(trial)
+      @unpack dropc1, dropc2, dropc3, dropc4, dropc5 = trial
+      # @info "objective: optimizer=$optfn, η=$η, λ=$λ"
+      @info "objective: dropc1=$dropc1, dropc2=$dropc2, dropc3=$dropc3, dropc4=$dropc4, dropc5=$dropc5"
 
-### training
-@info "start training ..."
+      # model
+      Random.seed!(1234)   # to enforce reproducibility
+      model = UNet5(3,C; activation=leakyrelu, alpha=1, verbose=false,
+                   dropc1=dropc1, dropc2=dropc2, dropc3=dropc3, dropc4=dropc4, dropc5=dropc5) |> dev
 
-number_since_best = 20
-patience = 5
-metrics = [
-      AccScore,
-      F1Score,
-      IoUScore,
-]
+      # check for matching between model and data
+      @assert size(model(Xtr)) == size(ytr) || error("model/data features do not match")
+
+      # optimizer
+      η = 1e-4
+      λ = 0.0
+      modelOptimizer = λ > 0 ? Flux.Optimiser(WeightDecay(λ), Adam(η)) : Adam(η)
+      optimizerState = Flux.setup(modelOptimizer, model)
+
+      # callbacks
+      number_since_best = 5
+      patience = 5
+      es = Flux.early_stopping(()->validloss, number_since_best; init_score = Inf)
+      pl = Flux.plateau(()->validloss, patience; init_score = Inf)
+
+      ### training
+      @info "start training ..."
+      metrics = []
+      final_loss = Inf
+
+      Random.seed!(1234)   # to enforce reproducibility
+      for epoch in 1:epochs
+            _ = trainEpoch!(lossFunction, model, trainset, optimizerState)
+            global validloss, _ = evaluateEpoch(lossFunction, model, validset, metrics)
+            @info "Thread: $(Threads.threadid()), Epoch: $epoch, Validation loss: $validloss"
+            if validloss < final_loss   final_loss = validloss   end
+
+            # callbacks
+            if isnan(validloss)
+                  @info "nan loss detected"
+                  break
+            elseif es()
+                  @info "early stopping"
+                  break
+            elseif pl()
+                  @info "plateau"
+                  break
+            elseif epoch == epochs
+                  @info "max epochs"
+                  # no break here, leave the loop
+            end
+      end
+
+      # save partial results
+      # push!(results, [string(optfn), η, λ, final_loss])
+      push!(results, [dropc1, dropc2, dropc3, dropc4, dropc5, final_loss])
+      outputfile = script_name[1:end-3] * ".csv"
+      CSV.write(outputfile, results)
+      
+      LibCUDA.cleangpu()
+      return final_loss |> Float64
+end
+
 
 LibCUDA.cleangpu()
-Random.seed!(1234)   # to enforce reproducibility
-Learn!(
-      lossfns,
-      model,
-      (trainset, validset),
-      optimizerState,
-      epochs,
-      metrics=metrics,
-      earlystops=(number_since_best, patience),
-      modelspath=modelspath * "train/",
-      tblogspath=tblogspath * "train/"
+
+
+### hyperparameters tuning
+# lossfns = [ce3_loss, cosine_loss, Flux.kldivergence, Flux.poisson_loss]
+# optfns = [Flux.Adam, Flux.RMSProp]
+# ηs = [1.e-4, 5.e-4]
+# λs = [0.0, 5.e-7, 5.e-5]
+dropc1s = [0.0, 0.1, 0.2]
+dropc2s = [0.0, 0.1, 0.2]
+dropc3s = [0.0, 0.1, 0.2]
+dropc4s = [0.0, 0.1, 0.2]
+dropc5s = [0.0, 0.1, 0.2]
+
+if debugflag
+      # lossfns = lossfns[1:2]
+      # optfns  = optfns[1:2]
+      # ηs      = ηs[1:2]
+      # λs      = λs[1:2]
+      dropc1s = dropc1s[1:2]
+      dropc2s = dropc2s[1:2]
+      dropc3s = dropc3s[1:1]
+      dropc4s = dropc4s[1:1]
+      dropc5s = dropc5s[1:1]
+end
+
+
+scenario = Scenario(
+      # lossfn  = lossfns,
+      # optfn   = optfns,
+      # η       = ηs,
+      # λ       = λs,
+      dropc1  = dropc1s,
+      dropc2  = dropc2s,
+      dropc3  = dropc3s,
+      dropc4  = dropc4s,
+      dropc5  = dropc5s,
+      sampler = GridSampler(),
 )
-fpfn = expanduser(modelspath) * "train/model.jld2"
-mv(fpfn, expanduser(modelspath) * "train/bestmodel.jld2", force=true)
-@info "training OK"
+
+HyperTuning.optimize(objective, scenario)
 
 
-# ### tuning
-# @info "start tuning ..."
-# fpfn = expanduser(modelspath) * "train/bestmodel.jld2"
-# LibFluxML.loadModelState!(fpfn, modelcpu)
-# model = modelcpu |> dev
+# sort and save results
+results = sort(results, :validloss)
+outputfile = script_name[1:end-3] * ".csv"
+CSV.write(outputfile, results)
 
-# Flux.thaw!(optimizerState)
-# Flux.adjust!(optimizerState, η/10)
-# @info "optimizer adjusted"
-
-# LibCUDA.cleangpu()
-# Random.seed!(1234)   # to enforce reproducibility
-# Learn!(
-#       lossfns,
-#       model,
-#       (trainset, validset),
-#       optimizerState,
-#       epochs,
-#       metrics=metrics,
-#       earlystops=(number_since_best, patience),
-#       modelspath=modelspath * "tune/",
-#       tblogspath=tblogspath * "tune/"
-# )
-
-# fpfn = expanduser(modelspath) * "tune/model.jld2"
-# mv(fpfn, expanduser(modelspath) * "tune/bestmodel.jld2", force=true)
-# @info "tuning OK"
-
+# show results
+display(scenario)
+display(history(scenario))
 
 ### clean memory
 close(io_xtrain)
