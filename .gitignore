@@ -1,5 +1,9 @@
 .vscode/
-dataset/augmented
-dataset/resized
 models/
 tblogs/
+
+# symlinks
+coco
+dataset/augmented
+dataset/resized
+images
