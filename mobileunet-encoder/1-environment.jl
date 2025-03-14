@@ -1,6 +1,6 @@
 ### libs
 using Pkg
-envpath = expanduser("~/envs/dev/")
+envpath = expanduser("~/envs/d8reg/")
 Pkg.activate(envpath)
 
 using CUDA

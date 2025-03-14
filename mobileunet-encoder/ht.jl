@@ -7,7 +7,7 @@ foldername = basename(pwd())
 # nepochs    = parse(Int64, ARGS[2])
 # debugflag  = parse(Bool,  ARGS[3])
 
-cudadevice = 0
+cudadevice = 1
 nepochs    = 200
 debugflag  = true
 
