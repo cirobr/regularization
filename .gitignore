@@ -1,7 +1,10 @@
 .vscode/
+dataset/images
 models/
-tblogs/
+# tblogs/
+*.Identifier
+
 
 # symlinks
 coco
-dataset/images
+pascalvoc
