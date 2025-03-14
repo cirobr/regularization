@@ -1,7 +1,7 @@
 @info "hypertuning start..."
 
 # loss function
-lossFunction(yhat, y) = cosine_loss(yhat, y)
+lossFunction(yhat, y) = cosine_loss(yhat, y)   # fixed for this study
 @info "loss function OK"
 
 # optimizer parameters
@@ -10,6 +10,16 @@ optfn = Flux.Adam
 λ = 0.0      # default 5e-4
 @info "optimizer params OK"
 
+
+# results DataFrame
+results = DataFrame(
+      d1        = Float32[],
+      d2        = Float32[],
+      d3        = Float32[],
+      d4        = Float32[],
+      d5        = Float32[],
+      validloss = Float32[],
+)
 
 
 # tuning function
@@ -34,14 +44,11 @@ function objective(trial)
       optimizerState = Flux.setup(modelOptimizer, model)
 
       # callbacks
-      number_since_best = 10
-      patience = 5
-      es = Flux.early_stopping(()->validloss, number_since_best, init_score = Inf)
-      pl = Flux.plateau(()->validloss, patience, init_score = Inf)
+      es = Flux.early_stopping(()->validloss, number_since_best; init_score = Inf)
+      pl = Flux.plateau(()->validloss, patience; init_score = Inf)
 
 
       ### training
-      # @info "start scenario..."
       metrics = []
       final_loss = Inf
 
@@ -49,7 +56,7 @@ function objective(trial)
       for epoch in 1:epochs
             _ = trainEpoch!(train_lossfn, model, distillation_trainset, optimizerState)
             global validloss, _ = evaluateEpoch(valid_lossfn, model, distillation_validset, metrics)
-            @info "Thread: $(Threads.threadid()), Epoch: $epoch, Validation loss: $validloss"
+            @info "Epoch: $epoch, Validation loss: $validloss"
             if validloss < final_loss   final_loss = validloss   end
 
             # callbacks
@@ -68,6 +75,11 @@ function objective(trial)
             end
       end
 
+      # save partial results
+      push!(results, [d1,d2,d3,d4,d5,final_loss])
+      outputfile = script_name[1:end-3] * ".csv"
+      CSV.write(outputfile, results)
+      
       LibCUDA.cleangpu()
       return final_loss |> Float64
 end
@@ -81,13 +93,12 @@ d4s = [0.0, 0.1, 0.2]
 d5s = [0.0, 0.1, 0.2]
 
 if debugflag
-      d1s     = d1s[1:2]
-      d2s     = d2s[2:2]
-      d3s     = d3s[2:2]
-      d4s     = d4s[2:2]
-      d5s     = d5s[2:2]
+      d1s = d1s[1:2]
+      d2s = d2s[1:1]
+      d3s = d3s[1:1]
+      d4s = d4s[1:1]
+      d5s = d5s[1:1]
 end
-
 
 scenario = Scenario(
       d1 = d1s,
@@ -99,6 +110,11 @@ scenario = Scenario(
 )
 
 HyperTuning.optimize(objective, scenario)
+
+# sort and save results
+results = sort(results, :validloss)
+outputfile = script_name[1:end-3] * ".csv"
+CSV.write(outputfile, results)
 
 # show results
 display(scenario)
@@ -112,4 +128,4 @@ open(outputfile, "w") do io
       println(io, "history:")
       println(io, history(scenario))
 end
-@info "project finished"
+@info "hypertuning OK"
