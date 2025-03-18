@@ -12,15 +12,16 @@ optfn = Flux.Adam
 
 
 # results DataFrame
-results = DataFrame(
-      d1        = Float32[],
-      d2        = Float32[],
-      d3        = Float32[],
-      d4        = Float32[],
-      d5        = Float32[],
-      validloss = Float32[],
-)
-
+# results = DataFrame(
+#       d1        = Float32[],
+#       d2        = Float32[],
+#       d3        = Float32[],
+#       d4        = Float32[],
+#       d5        = Float32[],
+#       validloss = Float32[],
+# )
+results = CSV.read("ht.csv", DataFrame)
+@info "results DataFrame OK"
 
 # tuning function
 function objective(trial)
@@ -28,6 +29,12 @@ function objective(trial)
       @unpack d1,d2,d3,d4,d5 = trial
       @info "hyper parameters: $d1, $d2, $d3, $d4, $d5"
       drop_dec = (d1, d2, d3, d4, d5)
+
+      # Check if drop_dec is already in results
+      if any(row -> row.d1 == d1 && row.d2 == d2 && row.d3 == d3 && row.d4 == d4 && row.d5 == d5, eachrow(results))
+            @info "Combination already evaluated: $d1, $d2, $d3, $d4, $d5"
+            return Inf
+      end
 
       train_lossfn = lossFunction
       valid_lossfn = lossFunction
