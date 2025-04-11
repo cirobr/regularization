@@ -37,10 +37,7 @@ function objective(trial)
       valid_lossfn(yhat, y) = softloss(yhat, y, lossFunction; T=1.f0, dims=3)
 
       # model
-      Random.seed!(1234)   # to enforce reproducibility
-      drop_enc = (0.0, 0.2, 0.1, 0.1, 0.2)
-      drop_dec = ()
-      model = MobileUNet(3,C; drop_enc=drop_enc, drop_dec=drop_dec, verbose=false) |> gpu
+      model = instantiate_model() |> gpu   # always with same initial conditions
 
       # optimizer
       modelOptimizer = λ > 0 ? Flux.Optimiser(WeightDecay(λ), optfn(η)) : optfn(η)
