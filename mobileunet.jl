@@ -20,7 +20,7 @@ cd(@__DIR__)
 envpath    = "~/envs/d11reg/"
 cudadevice = 1
 nepochs    = 400
-debugflag  = true
+debugflag  = false
 
 @assert isdefined(Main, :envpath) "envpath not defined"
 @assert isdefined(Main, :cudadevice) "cudadevice not defined"
