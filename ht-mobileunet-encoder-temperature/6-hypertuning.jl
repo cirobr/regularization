@@ -1,7 +1,8 @@
 @info "hypertuning start..."
 
 # loss function
-lossFunction(yhat, y) = cosine_loss(yhat, y)   # fixed for this study
+# lossFunction(yhat, y) = cosine_loss(yhat, y)
+lossFunction(yhat, y) = Flux.kldivergence(yhat, y)
 @info "loss function OK"
 
 # optimizer parameters
@@ -23,7 +24,6 @@ function objective(trial)
       # search variables
       @unpack T = trial
       @info "hyper parameters: T=$T"
-      # cosine_loss fixed for this study only
       train_lossfn(yhat, y) = softloss(yhat, y, lossFunction; T=T, dims=3)
       valid_lossfn(yhat, y) = softloss(yhat, y, lossFunction; T=1.f0, dims=3)
 
@@ -35,10 +35,8 @@ function objective(trial)
       optimizerState = Flux.setup(modelOptimizer, model)
 
       # callbacks
-      es = Flux.early_stopping(()->validloss, number_since_best;
-            init_score = Inf, min_dist = 1.f-4)
-      pl = Flux.plateau(()->validloss, patience;
-            init_score = Inf, min_dist = 1.f-4)
+      es = Flux.early_stopping(()->validloss, number_since_best; init_score = Inf)
+      pl = Flux.plateau(()->validloss, patience; init_score = Inf)
 
 
       ### training
@@ -79,7 +77,8 @@ end
 
 
 ### hyperparameters tuning
-ts = 1 : 35 .|> Float32
+# ts = 1 : 35 .|> Float32
+ts = 1 : 1 .|> Float32
 
 if debugflag
       ts      = ts[1:4]

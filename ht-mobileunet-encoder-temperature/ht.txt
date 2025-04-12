@@ -1,31 +1,4 @@
-CUDA runtime 12.8, artifact installation
-CUDA driver 12.8
-NVIDIA driver 535.230.2
-
-CUDA libraries: 
-- CUBLAS: 12.8.4
-- CURAND: 10.3.9
-- CUFFT: 11.3.3
-- CUSOLVER: 11.7.3
-- CUSPARSE: 12.5.8
-- CUPTI: 2025.1.1 (API 26.0.0)
-- NVML: 12.0.0+535.230.2
-
-Julia packages: 
-- CUDA: 5.7.2
-- CUDA_Driver_jll: 0.12.1+1
-- CUDA_Runtime_jll: 0.16.1+0
-
-Toolchain:
-- Julia: 1.10.9
-- LLVM: 15.0.7
-
-Environment:
-- JULIA_CUDA_MEMORY_POOL: none
-
-2 devices:
-  0: NVIDIA RTX A5000 (sm_86, 23.676 GiB / 23.988 GiB available)
-  1: NVIDIA RTX A5000 (sm_86, 23.477 GiB / 23.988 GiB available)
+scenario:
 Scenario: evaluated 1 trials.
           parameters: T
    space cardinality: 1
@@ -47,7 +20,8 @@ Scenario: evaluated 1 trials.
 │ Objective │ 0.019324 │
 └───────────┴──────────┘
 
-┌───────────┬──────────┐
+history:
+HyperTuning.GroupedTrial[┌───────────┬──────────┐
 │     Trial │    Value │
 │         1 │          │
 ├───────────┼──────────┤
@@ -56,4 +30,4 @@ Scenario: evaluated 1 trials.
 │   Success │    false │
 │ Objective │ 0.019324 │
 └───────────┴──────────┘
-
+]
