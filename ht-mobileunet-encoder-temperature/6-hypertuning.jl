@@ -16,8 +16,6 @@ results = DataFrame(
       T         = Float32[],
       validloss = Float32[],
 )
-# results = CSV.read("ht.csv", DataFrame)
-
 
 
 # tuning function
@@ -25,13 +23,6 @@ function objective(trial)
       # search variables
       @unpack T = trial
       @info "hyper parameters: T=$T"
-
-      # # Check if T is already in results
-      # if any(row -> row.T == T, eachrow(results))
-      #       @info "Combination already evaluated: T=$T"
-      #       return Inf
-      # end
-      
       # cosine_loss fixed for this study only
       train_lossfn(yhat, y) = softloss(yhat, y, lossFunction; T=T, dims=3)
       valid_lossfn(yhat, y) = softloss(yhat, y, lossFunction; T=1.f0, dims=3)

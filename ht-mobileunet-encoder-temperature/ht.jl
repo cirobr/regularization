@@ -3,9 +3,9 @@ cd(@__DIR__)
 foldername = basename(pwd())
 
 ### arguments
-# cudadevice = parse(Int64, ARGS[1])
-# nepochs    = parse(Int64, ARGS[2])
-# debugflag  = parse(Bool,  ARGS[3])
+cudadevice = parse(Int64, ARGS[1])
+nepochs    = parse(Int64, ARGS[2])
+debugflag  = parse(Bool,  ARGS[3])
 
 # cudadevice = 1
 # nepochs    = 200
@@ -31,7 +31,7 @@ include("3-teacher-model-resnet50.jl")
 
 
 
-# include("4-student-model-mobileunet.jl")
+include("4-student-model-mobileunet.jl")
 
 # check frontend student matching
 Xtr = first(trainset) |> gpu
