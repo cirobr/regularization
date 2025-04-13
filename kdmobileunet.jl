@@ -306,7 +306,8 @@ backendlossfns = [backendLossFunction]
 frontend_T = 1.f0   ### Distillation temperature ###
 
 # frontendLossFunction(yhat, y) = cosine_loss(yhat, y)
-frontendLossFunction(yhat, y) = Flux.kldivergence(yhat, y)
+# frontendLossFunction(yhat, y) = Flux.kldivergence(yhat, y)
+frontendLossFunction(yhat, y) = Flux.poisson_loss(yhat, y)
 frontendTrainLossFunction(yhat, y) = softloss(yhat, y, frontendLossFunction; T=frontend_T, dims=3)
 frontendValidLossFunction(yhat, y) = softloss(yhat, y, frontendLossFunction; T=1.f0, dims=3)
 frontendlossfns = [frontendTrainLossFunction, frontendValidLossFunction]
@@ -386,8 +387,6 @@ backendModelOptimizer = backend_λ > 0 ? Flux.Optimiser(WeightDecay(backend_λ),
 backendOptimizerState = Flux.setup(backendModelOptimizer, backend_studentmodel)
 
 # front-end freezing (not needed for kd logits)
-# Flux.freeze!(backendOptimizerState.downsampling)
-# Flux.freeze!(backendOptimizerState.encoder)
 Flux.freeze!(backendOptimizerState.d)
 
 
